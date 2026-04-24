@@ -14,54 +14,24 @@ env:
 
 jobs:
   destroy-demo:
-    name: Destroy Demo
+    name: Destroy Demo (Lab 1)
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-
-      - name: Restore Demo State
-        uses: actions/cache/restore@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          path: |
-            terraform.tfstate
-            terraform.tfstate.backup
-            .terraform
-          key: terraform-state-${{ github.repository }}
-        continue-on-error: true
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Destroy Demo
-        run: terraform destroy -auto-approve
-        continue-on-error: true
-
-  # Destroy dev bucket (created by main terraform.yml using default environment)
-  destroy-dev:
-    name: Destroy Dev
-    runs-on: ubuntu-latest
-    if: github.event.inputs.confirm == 'destroy'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-
-      - name: Restore Dev State
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            terraform.tfstate
-            terraform.tfstate.backup
-            .terraform
-          key: terraform-state-${{ github.repository }}
-        continue-on-error: true
-
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Destroy Dev
-        run: terraform destroy -auto-approve -var="environment=dev"
+      - name: Delete Demo Bucket
+        run: |
+          # Find and delete any cloudburst-demo-* buckets
+          for bucket in $(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'cloudburst-demo-')].Name" --output text); do
+            echo "Deleting bucket: $bucket"
+            aws s3 rb "s3://$bucket" --force
+          done
         continue-on-error: true
 
   destroy-staging:
